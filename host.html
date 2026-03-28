@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>📻 Radio Host Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --card: #141414; --accent: #ff3c3c;
+      --accent2: #ff8c00; --text: #f0ede8; --muted: #555; --border: #1e1e1e;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px; gap: 16px;
+    }
+
+    #yt-player { display: none; }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 52px; letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .sub {
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 3px; text-transform: uppercase; margin-top: 2px;
+    }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 4px; padding: 24px; width: 100%; max-width: 500px;
+    }
+
+    .section-label {
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 14px;
+    }
+
+    /* Now playing */
+    .now-playing {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+    }
+    .np-thumb {
+      width: 56px; height: 56px; border-radius: 2px;
+      object-fit: cover; background: #111; flex-shrink: 0;
+    }
+    .np-info { flex: 1; overflow: hidden; }
+    .np-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .np-meta { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+    /* Progress */
+    .prog-wrap {
+      height: 3px; background: var(--border);
+      border-radius: 2px; margin-bottom: 6px;
+    }
+    .prog-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px; width: 0%;
+      transition: width 0.5s linear;
+    }
+    .prog-times {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--muted); margin-bottom: 20px;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex; align-items: center;
+      justify-content: center; gap: 12px; flex-wrap: wrap;
+    }
+    .btn {
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: 'DM Mono', monospace;
+      font-size: 11px; letter-spacing: 1px;
+      padding: 10px 18px; border-radius: 2px;
+      cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-big {
+      background: var(--accent); border: none; color: white;
+      font-size: 18px; width: 52px; height: 52px;
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+      box-shadow: 0 0 20px rgba(255,60,60,0.3);
+    }
+    .btn-big:hover { background: #ff5555; transform: scale(1.07); }
+
+    /* Status */
+    .status-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 10px; color: var(--muted); margin-top: 16px;
+    }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--muted); transition: background 0.3s;
+    }
+    .status-dot.live { background: #00e676; animation: blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* Playlist */
+    .playlist { display: flex; flex-direction: column; gap: 0; }
+    .pl-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.15s; border-radius: 2px;
+    }
+    .pl-item:last-child { border-bottom: none; }
+    .pl-item:hover { background: rgba(255,255,255,0.03); }
+    .pl-item.active { background: rgba(255,60,60,0.08); }
+    .pl-num { font-size: 10px; color: var(--muted); width: 18px; text-align:center; }
+    .pl-item.active .pl-num { color: var(--accent); }
+    .pl-thumb { width: 34px; height: 34px; border-radius: 2px; object-fit: cover; background: #111; }
+    .pl-title { font-size: 12px; flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pl-item.active .pl-title { color: var(--accent); }
+    .pl-play { font-size: 10px; color: var(--accent); display: none; }
+    .pl-item.active .pl-play { display: block; }
+
+    /* Listeners */
+    .listeners-card {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .listener-count {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px; color: var(--accent);
+    }
+    .listener-label { font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+
+    /* Volume */
+    .vol-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12px; color: var(--muted); margin-top: 16px;
+    }
+    input[type=range] {
+      flex: 1; -webkit-appearance: none;
+      height: 3px; background: var(--border);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+    }
+
+    /* EQ animation */
+    .eq { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+    .eq-b {
+      width: 3px; background: var(--accent); border-radius: 1px;
+      animation: eq 0.7s ease-in-out infinite alternate;
+    }
+    .eq-b:nth-child(1){height:5px;animation-delay:0s}
+    .eq-b:nth-child(2){height:12px;animation-delay:0.1s}
+    .eq-b:nth-child(3){height:8px;animation-delay:0.2s}
+    .eq-b:nth-child(4){height:14px;animation-delay:0.05s}
+    @keyframes eq { from{transform:scaleY(0.3)} to{transform:scaleY(1)} }
+    .eq.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div style="text-align:center">
+  <div class="logo">RADIO HOST</div>
+  <div class="sub">🎙 Control Panel · Only you see this</div>
+</div>
+
+<div id="yt-player"></div>
+
+<!-- Now Playing -->
+<div class="card" style="max-width:500px;width:100%">
+  <div class="section-label">Now On Air</div>
+  <div class="now-playing">
+    <img class="np-thumb" id="npThumb" src="" alt=""/>
+    <div class="np-info">
+      <div class="np-title" id="npTitle">Loading...</div>
+      <div class="np-meta" id="npMeta">Track 1 / 1</div>
+    </div>
+    <div class="eq" id="eq">
+      <div class="eq-b"></div><div class="eq-b"></div>
+      <div class="eq-b"></div><div class="eq-b"></div>
+    </div>
+  </div>
+
+  <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
+  <div class="prog-times">
+    <span id="tCur">0:00</span><span id="tDur">0:00</span>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="hostPrev()">⏮ Prev</button>
+    <button class="btn-big" id="btnPlayPause">⏸</button>
+    <button class="btn" onclick="hostNext()">Next ⏭</button>
+    <button class="btn" onclick="hostShuffle()">⇌ Shuffle</button>
+    <button class="btn" onclick="hostSync()">↺ Re-sync All</button>
+  </div>
+
+  <div class="vol-row">
+    🔈 <input type="range" id="vol" min="0" max="100" value="80"/> 🔊
+  </div>
+
+  <div class="status-row">
+    <div class="status-dot live" id="statusDot"></div>
+    <span id="statusText">Connecting...</span>
+  </div>
+</div>
+
+<!-- Listeners -->
+<div class="card" style="max-width:500px;width:100%">
+  <div class="section-label">Live Listeners</div>
+  <div class="listeners-card">
+    <div>
+      <div class="listener-count" id="listenerCount">0</div>
+      <div class="listener-label">PEOPLE TUNED IN</div>
+    </div>
+    <div style="font-size:32px">👥</div>
+  </div>
+</div>
+
+<!-- Playlist -->
+<div class="card" style="max-width:500px;width:100%">
+  <div class="section-label">Playlist</div>
+  <div class="playlist" id="playlist"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCznrcHaPyps5FPv8GqMcnO3pLJmFdpQtI",
+    authDomain: "myradio-924cf.firebaseapp.com",
+    databaseURL: "https://myradio-924cf-default-rtdb.firebaseio.com",
+    projectId: "myradio-924cf",
+    storageBucket: "myradio-924cf.firebasestorage.app",
+    messagingSenderId: "285677444365",
+    appId: "1:285677444365:web:921816c5ab1204cefb2444"
+  };
+
+  const PLAYLIST = [
+    { title: "Ta3al",    id: "4R5zsoxjARk" },
+    { title: "Trag Aer", id: "X4aEnz7zPlo" },
+  ];
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  const radioRef     = ref(db, 'radio/state');
+  const listenersRef = ref(db, 'radio/listeners');
+
+  let player, currentState = null, progInterval;
+  let isPlaying = true;
+
+  // Build playlist
+  const plEl = document.getElementById('playlist');
+  PLAYLIST.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'pl-item'; el.id = 'pl-' + i;
+    el.innerHTML = `
+      <span class="pl-num">${i+1}</span>
+      <img class="pl-thumb" src="https://img.youtube.com/vi/${t.id}/default.jpg"/>
+      <span class="pl-title">${t.title}</span>
+      <span class="pl-play">▶ PLAYING</span>
+    `;
+    el.onclick = () => pushState(i);
+    plEl.appendChild(el);
+  });
+
+  function pushState(index) {
+    set(radioRef, { index, startedAt: Date.now(), playing: true });
+  }
+
+  function updateUI(state) {
+    const t = PLAYLIST[state.index];
+    if (!t) return;
+    document.getElementById('npTitle').textContent = t.title;
+    document.getElementById('npMeta').textContent  = 'Track ' + (state.index+1) + ' / ' + PLAYLIST.length;
+    document.getElementById('npThumb').src = 'https://img.youtube.com/vi/' + t.id + '/maxresdefault.jpg';
+    document.getElementById('statusText').textContent = 'Live · ' + t.title;
+    document.querySelectorAll('.pl-item').forEach((el,i) => el.classList.toggle('active', i === state.index));
+    const act = document.getElementById('pl-' + state.index);
+    if (act) act.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  function fmt(s) {
+    if (!s || isNaN(s)) return '0:00';
+    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+  }
+
+  function startProg() {
+    clearInterval(progInterval);
+    progInterval = setInterval(() => {
+      if (!player || !player.getCurrentTime) return;
+      const c = player.getCurrentTime(), d = player.getDuration();
+      if (d > 0) {
+        document.getElementById('progBar').style.width = (c/d*100) + '%';
+        document.getElementById('tCur').textContent = fmt(c);
+        document.getElementById('tDur').textContent = fmt(d);
+      }
+    }, 500);
+  }
+
+  function applyState(state) {
+    if (!player || !player.loadVideoById) return;
+    const t = PLAYLIST[state.index];
+    if (!t) return;
+    const elapsed = (Date.now() - state.startedAt) / 1000;
+    player.loadVideoById({ videoId: t.id, startSeconds: Math.max(0, elapsed) });
+    updateUI(state);
+    document.getElementById('eq').classList.remove('hidden');
+    startProg();
+  }
+
+  onValue(radioRef, snap => {
+    const state = snap.val();
+    if (!state) return;
+    currentState = state;
+    applyState(state);
+  });
+
+  onValue(listenersRef, snap => {
+    const data = snap.val() || {};
+    document.getElementById('listenerCount').textContent = Object.keys(data).length;
+  });
+
+  window.onYouTubeIframeAPIReady = function() {
+    player = new YT.Player('yt-player', {
+      height: '0', width: '0',
+      playerVars: { autoplay: 1, controls: 0 },
+      events: {
+        onReady: e => {
+          e.target.setVolume(80);
+          // Auto-start: if no state in Firebase yet, push track 0
+          get(radioRef).then(snap => {
+            if (!snap.val()) pushState(0);
+          });
+        },
+        onStateChange: e => {
+          if (e.data === YT.PlayerState.ENDED) {
+            // Auto advance shuffled
+            const next = Math.floor(Math.random() * PLAYLIST.length);
+            pushState(next);
+          }
+        }
+      }
+    });
+  };
+
+  // Host controls exposed globally
+  window.hostNext = () => {
+    const next = currentState ? (currentState.index + 1) % PLAYLIST.length : 0;
+    pushState(next);
+  };
+  window.hostPrev = () => {
+    const prev = currentState ? (currentState.index - 1 + PLAYLIST.length) % PLAYLIST.length : 0;
+    pushState(prev);
+  };
+  window.hostShuffle = () => pushState(Math.floor(Math.random() * PLAYLIST.length));
+  window.hostSync    = () => { if (currentState) pushState(currentState.index); };
+
+  document.getElementById('btnPlayPause').onclick = () => {
+    if (!player) return;
+    if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+      player.pauseVideo(); isPlaying = false;
+      document.getElementById('btnPlayPause').textContent = '▶';
+      document.getElementById('eq').classList.add('hidden');
+    } else {
+      player.playVideo(); isPlaying = true;
+      document.getElementById('btnPlayPause').textContent = '⏸';
+      document.getElementById('eq').classList.remove('hidden');
+    }
+  };
+
+  document.getElementById('vol').oninput = function() {
+    if (player && player.setVolume) player.setVolume(this.value);
+  };
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

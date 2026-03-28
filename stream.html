@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Radio Stream</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #000;
+      color: #fff;
+      font-family: monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #yt-player { display: none; }
+
+    .tap-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .tap-screen.hidden { display: none; }
+    .tap-icon { font-size: 48px; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .tap-text { font-size: 13px; letter-spacing: 4px; color: #aaa; }
+
+    .status {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #444;
+      text-align: center;
+    }
+    .status b { color: #ff3c3c; }
+
+    .vol-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: #444;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 120px;
+      height: 2px;
+      background: #222;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #ff3c3c;
+    }
+  </style>
+</head>
+<body>
+
+<div class="tap-screen" id="tapScreen">
+  <div class="tap-icon">📻</div>
+  <div class="tap-text">TAP TO TUNE IN</div>
+</div>
+
+<div id="yt-player"></div>
+<div class="status" id="status">Connecting...</div>
+<div class="vol-wrap">
+  🔈 <input type="range" id="vol" min="0" max="100" value="80"/> 🔊
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCznrcHaPyps5FPv8GqMcnO3pLJmFdpQtI",
+    authDomain: "myradio-924cf.firebaseapp.com",
+    databaseURL: "https://myradio-924cf-default-rtdb.firebaseio.com",
+    projectId: "myradio-924cf",
+    storageBucket: "myradio-924cf.firebasestorage.app",
+    messagingSenderId: "285677444365",
+    appId: "1:285677444365:web:921816c5ab1204cefb2444"
+  };
+
+  const PLAYLIST = [
+    { title: "Ta3al",    id: "4R5zsoxjARk" },
+    { title: "Trag Aer", id: "X4aEnz7zPlo" },
+  ];
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  const radioRef = ref(db, 'radio/state');
+
+  // Listener presence
+  const myId  = Math.random().toString(36).slice(2);
+  const myRef = ref(db, 'radio/listeners/' + myId);
+
+  let player, started = false, currentState = null;
+
+  function applyState(state) {
+    if (!player || !player.loadVideoById) return;
+    const track = PLAYLIST[state.index];
+    if (!track) return;
+    const elapsed = (Date.now() - state.startedAt) / 1000;
+    player.loadVideoById({ videoId: track.id, startSeconds: Math.max(0, elapsed) });
+    document.getElementById('status').innerHTML =
+      '● ON AIR &nbsp;·&nbsp; <b>' + track.title + '</b>';
+  }
+
+  onValue(radioRef, snap => {
+    const state = snap.val();
+    if (!state) {
+      document.getElementById('status').textContent = 'Waiting for host to start...';
+      return;
+    }
+    currentState = state;
+    if (started) applyState(state);
+  });
+
+  window.onYouTubeIframeAPIReady = function() {
+    player = new YT.Player('yt-player', {
+      height: '0', width: '0',
+      playerVars: { autoplay: 0, controls: 0 },
+      events: {
+        onReady: () => player.setVolume(80),
+        onStateChange: e => {
+          if (e.data === YT.PlayerState.ENDED && currentState) {
+            // Re-sync when song ends (host controls next)
+            setTimeout(() => applyState(currentState), 1000);
+          }
+        }
+      }
+    });
+  };
+
+  document.getElementById('tapScreen').addEventListener('click', () => {
+    document.getElementById('tapScreen').classList.add('hidden');
+    started = true;
+    set(myRef, { joined: Date.now() });
+    window.addEventListener('beforeunload', () => set(myRef, null));
+    if (currentState) applyState(currentState);
+    else document.getElementById('status').textContent = 'Waiting for host to start...';
+  });
+
+  document.getElementById('vol').oninput = function() {
+    if (player && player.setVolume) player.setVolume(this.value);
+  };
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

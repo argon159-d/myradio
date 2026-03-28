@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📻 My Radio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --card: #181818;
+      --accent: #ff3c3c;
+      --accent2: #ff8c00;
+      --text: #f0ede8;
+      --muted: #555;
+      --border: #222;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,60,60,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,60,60,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      line-height: 1;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header .tagline {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .top-badges {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: white;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      padding: 4px 10px;
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .live-badge.visible { opacity: 1; }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: white;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    .listeners-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      border-radius: 2px;
+    }
+    .listeners-badge span { color: var(--text); }
+
+    .player-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 28px;
+      margin-bottom: 16px;
+    }
+
+    #yt-player { display: none; }
+
+    .art-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      margin-bottom: 24px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: #0d0d0d;
+    }
+
+    .art-wrap img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.4s;
+    }
+
+    .art-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%);
+    }
+
+    .vinyl-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,60,60,0.4);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .vinyl-ring.spinning {
+      opacity: 1;
+      animation: spin 3s linear infinite;
+    }
+    @keyframes spin { from{transform:translate(-50%,-50%) rotate(0deg)} to{transform:translate(-50%,-50%) rotate(360deg)} }
+
+    .eq-bars {
+      position: absolute;
+      bottom: 14px; left: 14px;
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 20px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .eq-bars.active { opacity: 1; }
+    .eq-bar {
+      width: 3px;
+      background: var(--accent);
+      border-radius: 1px;
+      animation: eq 0.8s ease-in-out infinite alternate;
+    }
+    .eq-bar:nth-child(1){height:6px;animation-delay:0s}
+    .eq-bar:nth-child(2){height:14px;animation-delay:0.1s}
+    .eq-bar:nth-child(3){height:10px;animation-delay:0.2s}
+    .eq-bar:nth-child(4){height:18px;animation-delay:0.05s}
+    .eq-bar:nth-child(5){height:8px;animation-delay:0.15s}
+    @keyframes eq {
+      from { transform: scaleY(0.3); }
+      to { transform: scaleY(1); }
+    }
+
+    /* Sync indicator */
+    .sync-indicator {
+      position: absolute;
+      top: 12px; right: 12px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 4px 8px;
+      font-size: 9px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .sync-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .sync-dot.synced { background: #00e676; }
+
+    .track-info { margin-bottom: 20px; }
+    .track-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px;
+      letter-spacing: 1px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-index {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    .progress-wrap {
+      position: relative;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-bottom: 20px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.5s linear;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: -14px;
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 18px;
+      transition: color 0.2s, transform 0.1s;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn:hover { color: var(--text); transform: scale(1.1); }
+    .btn.active { color: var(--accent); }
+
+    .btn-play {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white !important;
+      font-size: 22px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.2s;
+      box-shadow: 0 0 20px rgba(255,60,60,0.3);
+    }
+    .btn-play:hover { transform: scale(1.08); background: #ff5555; }
+    .btn-play:active { transform: scale(0.96); }
+
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .vol-icon { font-size: 14px; color: var(--muted); }
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Host panel */
+    .host-panel {
+      background: rgba(255,60,60,0.05);
+      border: 1px solid rgba(255,60,60,0.2);
+      border-radius: 4px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .host-panel.visible { display: block; }
+    .host-label {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .host-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .host-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 6px 12px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .host-btn:hover { background: var(--card); border-color: var(--accent); color: var(--accent); }
+
+    .playlist-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .playlist-header {
+      padding: 14px 20px;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .playlist-count {
+      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-size: 9px;
+    }
+
+    .playlist-list {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .playlist-list::-webkit-scrollbar { width: 4px; }
+    .playlist-list::-webkit-scrollbar-track { background: transparent; }
+    .playlist-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .playlist-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .playlist-item:last-child { border-bottom: none; }
+    .playlist-item.active { background: rgba(255,60,60,0.07); }
+
+    .item-num {
+      font-size: 10px;
+      color: var(--muted);
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .playlist-item.active .item-num { color: var(--accent); }
+
+    .item-thumb {
+      width: 36px; height: 36px;
+      border-radius: 2px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+
+    .item-info { flex: 1; overflow: hidden; }
+    .item-title {
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .playlist-item.active .item-title { color: var(--accent); }
+    .item-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .item-playing {
+      display: none;
+      gap: 2px;
+      align-items: flex-end;
+      height: 14px;
+      flex-shrink: 0;
+    }
+    .playlist-item.active .item-playing { display: flex; }
+    .mini-bar {
+      width: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      animation: eq 0.6s ease-in-out infinite alternate;
+    }
+    .mini-bar:nth-child(1){height:6px;animation-delay:0s}
+    .mini-bar:nth-child(2){height:10px;animation-delay:0.15s}
+    .mini-bar:nth-child(3){height:7px;animation-delay:0.08s}
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-top: 12px;
+      padding: 0 4px;
+    }
+
+    /* Overlay for first click */
+    .click-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      cursor: pointer;
+    }
+    .click-overlay.hidden { display: none; }
+    .click-overlay .big-icon {
+      font-size: 64px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+    .click-overlay .click-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 4px;
+      color: var(--text);
+    }
+    .click-overlay .click-sub {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- First-click overlay (browser autoplay policy) -->
+<div class="click-overlay" id="clickOverlay">
+  <div class="big-icon">📻</div>
+  <div class="click-text">TAP TO TUNE IN</div>
+  <div class="click-sub">synchronized radio · everyone hears the same thing</div>
+</div>
+
+<div class="container">
+
+  <div class="header">
+    <div class="logo">RADIO</div>
+    <div class="tagline">Live · Synchronized · Free</div>
+    <div class="top-badges">
+      <div class="live-badge" id="liveBadge">
+        <span class="live-dot"></span> ON AIR
+      </div>
+      <div class="listeners-badge">
+        👥 <span id="listenerCount">0</span> listening
+      </div>
+    </div>
+  </div>
+
+  <div id="yt-player"></div>
+
+  <!-- Host panel (only visible if ?host=true in URL) -->
+  <div class="host-panel" id="hostPanel">
+    <div class="host-label">🎙 Host Controls</div>
+    <div class="host-controls">
+      <button class="host-btn" onclick="hostNext()">⏭ Next Track</button>
+      <button class="host-btn" onclick="hostPrev()">⏮ Prev Track</button>
+      <button class="host-btn" onclick="hostShuffle()">⇌ Shuffle Next</button>
+      <button class="host-btn" onclick="hostSync()">↺ Force Sync All</button>
+    </div>
+  </div>
+
+  <div class="player-card">
+
+    <div class="art-wrap">
+      <img id="artImg" src="" alt="cover"/>
+      <div class="art-overlay"></div>
+      <div class="vinyl-ring" id="vinylRing"></div>
+      <div class="eq-bars" id="eqBars">
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+      </div>
+      <div class="sync-indicator">
+        <div class="sync-dot" id="syncDot"></div>
+        <span id="syncText">CONNECTING</span>
+      </div>
+    </div>
+
+    <div class="track-info">
+      <div class="track-title" id="trackTitle">Connecting...</div>
+      <div class="track-index" id="trackIndex">SYNCING WITH STREAM</div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="time-row">
+      <span id="timeCurrent">0:00</span>
+      <span id="timeDuration">0:00</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btnMute" title="Mute">🔊</button>
+      <div style="width:40px"></div>
+      <button class="btn-play" id="btnPlay">⏸</button>
+      <div style="width:40px"></div>
+      <button class="btn" id="btnResync" title="Re-sync">⟳</button>
+    </div>
+
+    <div class="volume-row">
+      <span class="vol-icon">🔈</span>
+      <input type="range" id="volSlider" min="0" max="100" value="80"/>
+      <span class="vol-icon">🔊</span>
+    </div>
+
+  </div>
+
+  <div class="playlist-card">
+    <div class="playlist-header">
+      <span>Now Playing</span>
+      <span class="playlist-count" id="playlistCount">0 tracks</span>
+    </div>
+    <div class="playlist-list" id="playlistList"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="statusLeft">Waiting for stream...</span>
+    <span>Synchronized Radio</span>
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, get, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ============================================================
+  // 🔥 PASTE YOUR FIREBASE CONFIG HERE
+  // ===========================================================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCznrcHaPyps5FPv8GqMcnO3pLJmFdpQtI",
+  authDomain: "myradio-924cf.firebaseapp.com",
+  databaseURL: "https://myradio-924cf-default-rtdb.firebaseio.com",
+  projectId: "myradio-924cf",
+  storageBucket: "myradio-924cf.firebasestorage.app",
+  messagingSenderId: "285677444365",
+  appId: "1:285677444365:web:921816c5ab1204cefb2444"
+};
+  // ============================================================
+
+  // ============================================================
+  // 🎵 YOUR PLAYLIST — Add/remove YouTube video IDs here
+  // ============================================================
+  const PLAYLIST = [
+    { title: "Ta3al",       id: "4R5zsoxjARk" },
+    { title: "Trag Aer",      id: "X4aEnz7zPlo" },
+  ];
+  // ============================================================
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  const radioRef     = ref(db, 'radio/state');
+  const listenersRef = ref(db, 'radio/listeners');
+
+  // Check if host mode
+  const isHost = new URLSearchParams(window.location.search).get('host') === 'true';
+  if (isHost) document.getElementById('hostPanel').classList.add('visible');
+
+  let player, isMuted = false, started = false;
+  let currentState = null;
+  let progressInterval;
+
+  // Listener presence
+  const myId = Math.random().toString(36).slice(2);
+  const myRef = ref(db, 'radio/listeners/' + myId);
+
+  // Build playlist UI
+  function buildPlaylist() {
+    const list = document.getElementById('playlistList');
+    document.getElementById('playlistCount').textContent = PLAYLIST.length + ' tracks';
+    list.innerHTML = '';
+    PLAYLIST.forEach((track, i) => {
+      const item = document.createElement('div');
+      item.className = 'playlist-item';
+      item.id = 'item-' + i;
+      item.innerHTML = `
+        <span class="item-num">${i+1}</span>
+        <img class="item-thumb" src="https://img.youtube.com/vi/${track.id}/default.jpg" alt="">
+        <div class="item-info">
+          <div class="item-title">${track.title}</div>
+          <div class="item-sub">YouTube</div>
+        </div>
+        <div class="item-playing">
+          <div class="mini-bar"></div>
+          <div class="mini-bar"></div>
+          <div class="mini-bar"></div>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function updateUI(state) {
+    const track = PLAYLIST[state.index];
+    if (!track) return;
+
+    document.getElementById('trackTitle').textContent  = track.title;
+    document.getElementById('trackIndex').textContent  = 'TRACK ' + (state.index + 1) + ' / ' + PLAYLIST.length;
+    document.getElementById('artImg').src = 'https://img.youtube.com/vi/' + track.id + '/maxresdefault.jpg';
+    document.getElementById('statusLeft').textContent  = 'On air · ' + track.title;
+    document.getElementById('liveBadge').classList.add('visible');
+
+    document.querySelectorAll('.playlist-item').forEach((el, i) => {
+      el.classList.toggle('active', i === state.index);
+    });
+    const active = document.getElementById('item-' + state.index);
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function setPlayingVisuals(playing) {
+    document.getElementById('vinylRing').classList.toggle('spinning', playing);
+    document.getElementById('eqBars').classList.toggle('active', playing);
+    document.getElementById('btnPlay').textContent = playing ? '⏸' : '▶';
+  }
+
+  function setSynced(ok) {
+    document.getElementById('syncDot').classList.toggle('synced', ok);
+    document.getElementById('syncText').textContent = ok ? 'SYNCED' : 'SYNCING';
+  }
+
+  function formatTime(s) {
+    if (!s || isNaN(s)) return '0:00';
+    return Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+  }
+
+  function startProgress() {
+    clearInterval(progressInterval);
+    progressInterval = setInterval(() => {
+      if (!player || !player.getCurrentTime) return;
+      const cur = player.getCurrentTime();
+      const dur = player.getDuration();
+      if (dur > 0) {
+        document.getElementById('progressBar').style.width = (cur/dur*100) + '%';
+        document.getElementById('timeCurrent').textContent = formatTime(cur);
+        document.getElementById('timeDuration').textContent = formatTime(dur);
+      }
+    }, 500);
+  }
+
+  // Apply a radio state to the player
+  function applyState(state) {
+    if (!player || !player.loadVideoById) return;
+    const track = PLAYLIST[state.index];
+    if (!track) return;
+
+    const now       = Date.now();
+    const elapsed   = (now - state.startedAt) / 1000; // seconds since host started this track
+    const seekTo    = Math.max(0, elapsed);
+
+    player.loadVideoById({ videoId: track.id, startSeconds: seekTo });
+    updateUI(state);
+    setPlayingVisuals(true);
+    setSynced(true);
+    startProgress();
+  }
+
+  // Listen to Firebase for state changes
+  onValue(radioRef, (snap) => {
+    const state = snap.val();
+    if (!state) return;
+    currentState = state;
+    if (started) applyState(state);
+  });
+
+  // Listen to listener count
+  onValue(listenersRef, (snap) => {
+    const data  = snap.val() || {};
+    const count = Object.keys(data).length;
+    document.getElementById('listenerCount').textContent = count;
+  });
+
+  // YouTube API
+  window.onYouTubeIframeAPIReady = function() {
+    player = new YT.Player('yt-player', {
+      height: '0', width: '0',
+      playerVars: { autoplay: 0, controls: 0 },
+      events: {
+        onReady: () => {
+          player.setVolume(80);
+          // If host and no state exists yet, push initial state
+          if (isHost) {
+            get(radioRef).then(snap => {
+              if (!snap.val()) pushState(0);
+            });
+          }
+        },
+        onStateChange: (e) => {
+          if (e.data === YT.PlayerState.ENDED) {
+            if (isHost) {
+              // Auto-advance to next (shuffle)
+              const next = Math.floor(Math.random() * PLAYLIST.length);
+              pushState(next);
+            }
+          }
+        }
+      }
+    });
+  };
+
+  // Host: push new state to Firebase
+  function pushState(index) {
+    set(radioRef, {
+      index:     index,
+      startedAt: Date.now(),
+      playing:   true
+    });
+  }
+
+  // First click handler
+  document.getElementById('clickOverlay').addEventListener('click', () => {
+    document.getElementById('clickOverlay').classList.add('hidden');
+    started = true;
+
+    // Register as listener
+    set(myRef, { joined: Date.now() });
+    window.addEventListener('beforeunload', () => set(myRef, null));
+
+    if (currentState) applyState(currentState);
+    else {
+      document.getElementById('trackTitle').textContent = 'Waiting for host...';
+      document.getElementById('trackIndex').textContent = 'Stream not started yet';
+    }
+  });
+
+  // Re-sync button
+  document.getElementById('btnResync').onclick = () => {
+    setSynced(false);
+    if (currentState) {
+      setTimeout(() => applyState(currentState), 300);
+    }
+  };
+
+  // Play/pause (local mute only — can't pause the stream for others)
+  document.getElementById('btnPlay').onclick = () => {
+    if (!player) return;
+    const state = player.getPlayerState();
+    if (state === YT.PlayerState.PLAYING) {
+      player.pauseVideo();
+      setPlayingVisuals(false);
+    } else {
+      player.playVideo();
+      setPlayingVisuals(true);
+    }
+  };
+
+  // Mute
+  document.getElementById('btnMute').onclick = function() {
+    isMuted = !isMuted;
+    if (isMuted) { player.mute(); this.textContent = '🔇'; }
+    else { player.unMute(); this.textContent = '🔊'; }
+  };
+
+  // Volume
+  document.getElementById('volSlider').oninput = function() {
+    if (player && player.setVolume) player.setVolume(this.value);
+  };
+
+  // Host control functions (exposed globally)
+  window.hostNext = () => {
+    const next = currentState ? (currentState.index + 1) % PLAYLIST.length : 0;
+    pushState(next);
+  };
+  window.hostPrev = () => {
+    const prev = currentState ? (currentState.index - 1 + PLAYLIST.length) % PLAYLIST.length : 0;
+    pushState(prev);
+  };
+  window.hostShuffle = () => {
+    pushState(Math.floor(Math.random() * PLAYLIST.length));
+  };
+  window.hostSync = () => {
+    if (currentState) pushState(currentState.index);
+  };
+
+  buildPlaylist();
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
